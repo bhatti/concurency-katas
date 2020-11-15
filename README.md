@@ -1,2 +1,2 @@
 # concurency-katas
-Playground for experimenting concurrency primitives in various languages
+Examples of structured concurrency using Elixir, Erlang, GO, Kotlin, NodeJS/Typescript, and Rust.
