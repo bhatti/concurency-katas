@@ -1,0 +1,77 @@
+use std::time::{SystemTime, UNIX_EPOCH};
+use std::{error::Error, fmt};
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum State {
+    Started,
+    Completed,
+}
+
+#[derive(Debug)]
+pub enum CrawlError {
+    MaxDepthReached,
+    DownloadError,
+    ParseError,
+    IndexError,
+    ContentsNotChanged,
+}
+
+impl Error for CrawlError {}
+
+impl fmt::Display for CrawlError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            CrawlError::MaxDepthReached => write!(f, "MaxDepthReached"),
+            CrawlError::DownloadError => write!(f, "DownloadError"),
+            CrawlError::ParseError => write!(f, "ParseError"),
+            CrawlError::IndexError => write!(f, "IndexError"),
+            CrawlError::ContentsNotChanged => write!(f, "ContentsNotChanged"),
+        }
+    }
+}
+
+
+//type Handler interface {
+//    Handle(ctx context.Context, req Request) Response
+//}
+
+// Request encapsulates details of url to crawl
+#[derive(Debug, Clone, PartialEq)]
+pub struct Request {
+    pub url: String,
+    pub depth: u8,
+    pub created_at: u128,
+}
+
+impl Request {
+    pub fn new(url: &str, depth: u8) -> Request {
+        let epoch = SystemTime::now().duration_since(UNIX_EPOCH).expect("epoch failed").as_millis();
+        Request{url: url.to_string(), depth: depth, created_at: epoch}
+    }
+}
+
+// Request encapsulates details of url to crawl
+#[derive(Debug, Clone, PartialEq)]
+pub struct Response {
+    pub status: State,
+    pub child_urls: usize,
+    pub started_at: u128,
+    pub completed_at: u128,
+}
+
+impl Response {
+    pub fn new() -> Response {
+        let epoch = SystemTime::now().duration_since(UNIX_EPOCH).expect("epoch failed").as_millis();
+        Response{status: State::Started, child_urls: 0, started_at: epoch, completed_at: 0}
+    }
+
+    pub fn completed(&mut self, child_urls: usize) {
+        self.child_urls = child_urls;
+        self.completed_at = SystemTime::now().duration_since(UNIX_EPOCH).expect("epoch failed").as_millis();
+        self.status = State::Completed;
+    }
+}
+
+impl Default for Response {
+    fn default() -> Self { Response::new() }
+}
