@@ -10,51 +10,37 @@ defmodule Worker do
   use GenServer
 
   # Client APIs
-  def start_link(serverPid) when is_pid(serverPid) do
-    GenServer.start_link(__MODULE__, serverPid)
+  def start_link(crawler_pid) when is_pid(crawler_pid) do
+    {:ok, downloader_pid} = Downloader.start_link()
+    {:ok, indexer_pid} = Indexer.start_link()
+    GenServer.start_link(__MODULE__, {crawler_pid, downloader_pid, indexer_pid})
   end
 
   @doc """
   Crawls web url asynchronously
   """
-  def handle_cast({:crawl, request}, serverPid=state) do
-    handle_crawl(serverPid, request)
+  def handle_cast({:crawl, request}, {crawler_pid, downloader_pid, indexer_pid}=state) do
+    handle_crawl(crawler_pid, downloader_pid, indexer_pid, request)
     {:noreply, state}
   end
 
-  def init(serverPid) do
-      {:ok, serverPid}
+  def init(crawler_pid) do
+      {:ok, crawler_pid}
   end
 
   # Internal private methods
-  defp handle_crawl(serverPid, req) do
+  defp handle_crawl(crawler_pid, downloader_pid, indexer_pid, req) do
     res = Result.new(req)
-    contents = download(req.url)
-    new_contents = jsrender(req.url, contents)
+    contents = Downloader.download(downloader_pid, req.url)
+    new_contents = Downloader.jsrender(downloader_pid, req.url, contents)
     if has_content_changed(req.url, new_contents) and !is_spam(req.url, new_contents) do
-      index(req.url, new_contents)
-	  urls = parse_urls(req.url, new_contents)
-      Crawler.crawl_urls(serverPid, urls, req.depth+1, req.clientPid)
+      Indexer.index(indexer_pid, req.url, new_contents)
+      urls = parse_urls(req.url, new_contents)
+      Crawler.crawl_urls(crawler_pid, urls, req.depth+1, req.clientPid)
       send req.clientPid, {:crawl_done, Result.completed(res)}
     else
       send req.clientPid, {:crawl_done, Result.failed(req, :skipped_crawl)}
     end
-  end
-
-  defp download(_url) do
-    # TODO check robots.txt and throttle policies
-    # TODO add timeout for slow websites and linearize requests to the same domain to prevent denial of service attack
-    random_string(100)
-  end
-
-  defp jsrender(_url, _contents) do
-    # for SPA apps that use javascript for rendering contents
-    :ok
-  end
-
-  defp index(_url, _contents) do
-    # apply standardize, stem, ngram, etc for indexing
-    :ok
   end
 
   defp parse_urls(_Url, _Contents) do
@@ -83,11 +69,11 @@ defmodule Worker do
   defp random_domain() do
     Enum.random(@domains)
   end
+
   defp random_string(n) do
     1..n
     |> Enum.reduce([], fn(_, acc) -> [Enum.random(to_charlist(@allowed_chars)) | acc] end)
     |> Enum.join("")
   end
-
 end
 

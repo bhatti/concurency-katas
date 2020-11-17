@@ -7,7 +7,7 @@
 
 -export([crawl_urls/2, handle_crawl/1, ok_size/2]).
 
--record(request, {url, depth, timeout, created_at=erlang:system_time(millisecond)}).
+-record(request, {url, depth, timeout, downloader, indexer, created_at=erlang:system_time(millisecond)}).
 -record(result, {url, status=pending, child_urls=0, started_at=erlang:system_time(millisecond), completed_at, error}).
 
 -define(MAX_DEPTH, 4).
@@ -16,8 +16,8 @@
 -define(DOMAINS, ["ab.com", "bc.com", "cd.com", "de.com", "ef.com", "fg.com", "gh.com", "hi.com", "ij.com", "jk.com", "kl.com", "lm.com", "mn.com",
         "no.com", "op.com", "pq.com", "qr.com", "rs.com", "st.com", "tu.com", "uv.com", "vw.com", "wx.com", "xy.com", "yz.com"]).
 
-make_request(Url, Depth, Timeout) ->
-    #request{url=Url, depth=Depth, timeout=Timeout}.
+make_request(Url, Depth, Timeout, DownloaderPid, IndexerPid) ->
+    #request{url=Url, depth=Depth, timeout=Timeout, downloader=DownloaderPid, indexer=IndexerPid}.
 
 make_result(Req) ->
     Url = Req#request.url,
@@ -28,12 +28,14 @@ make_result(Req) ->
 %%% Urls - list of urls to crawl
 %%% Timeout - max timeout
 crawl_urls(Urls, Timeout) when is_list(Urls), is_integer(Timeout) ->
-    crawl_urls(Urls, 0, Timeout).
+    {ok, DownloaderPid} = downloader:start_link(),
+    {ok, IndexerPid} = indexer:start_link(),
+    crawl_urls(Urls, 0, Timeout, DownloaderPid, IndexerPid).
 
-crawl_urls(_, ?MAX_DEPTH, _) ->
+crawl_urls(_, ?MAX_DEPTH, _, _, _) ->
     [];
-crawl_urls(Urls, Depth, Timeout) when is_list(Urls), is_integer(Timeout), is_integer(Depth) ->
-    Requests = [make_request(R, Depth, Timeout) || R <- Urls],
+crawl_urls(Urls, Depth, Timeout, DownloaderPid, IndexerPid) when is_list(Urls), is_integer(Timeout), is_integer(Depth), is_pid(DownloaderPid), is_pid(IndexerPid) ->
+    Requests = [make_request(R, Depth, Timeout, DownloaderPid, IndexerPid) || R <- Urls],
     pmap:pmap(fun erlcrawler:handle_crawl/1, Requests, Timeout).
 
 %% Crawling a single request and then crawl child URLs using
@@ -47,16 +49,18 @@ handle_crawl(Req) ->
     Url = Req#request.url,
     Depth = Req#request.depth,
     Timeout = Req#request.timeout,
+    DownloaderPid = Req#request.downloader,
+    IndexerPid = Req#request.indexer,
 
-	case download(Url) of
+    case downloader:download(DownloaderPid, Url) of
         {ok, Contents} ->
-	        Contents1 = jsrender(Url, Contents),
-	        Changed = has_content_changed(Url, Contents1),
-	        Spam = is_spam(Url, Contents1),
-	        if Changed and not Spam ->
-			    index(Url, Contents1),
-			    Urls = parse_urls(Url, contents),
-                Res1 = crawl_urls(Urls, Depth+1, Timeout),
+            {ok, Contents1} = downloader:jsrender(DownloaderPid, Url, Contents),
+            Changed = has_content_changed(Url, Contents1),
+            Spam = is_spam(Url, Contents1),
+            if Changed and not Spam ->
+                indexer:index(IndexerPid, Url, Contents1),
+                Urls = parse_urls(Url, contents),
+                Res1 = crawl_urls(Urls, Depth+1, Timeout, DownloaderPid, IndexerPid),
                 Size = ok_size(Res1, 0),
                 Size+1;
             true ->
@@ -66,39 +70,26 @@ handle_crawl(Req) ->
             1
         end.
 
-download(_Url) ->
-    % TODO check robots.txt and throttle policies
-    % TODO add timeout for slow websites and linearize requests to the same domain to prevent denial of service attack
-    {ok, random_string(100)}.
-
-jsrender(_Url, _Contents) ->
- 	% for SPA apps that use javascript for rendering contents 
-    ok.
-
-index(_Url, _Contents) ->
- 	% apply standardize, stem, ngram, etc for indexing
-    ok.
-
 parse_urls(_Url, _Contents) ->
-	% tokenize contents and extract href/image/script urls
+    % tokenize contents and extract href/image/script urls
     random_urls(?MAX_URL).
 
 random_urls(N) ->
     [random_url() || _ <- lists:seq(1, N)].
 
 has_content_changed(_Url, _Contents) ->
- 	% calculate hash digest and compare it with last digest
+     % calculate hash digest and compare it with last digest
     true.
 
 is_spam(_Url, _Contents) ->
- 	% apply standardize, stem, ngram, etc for indexing
+     % apply standardize, stem, ngram, etc for indexing
     false.
 
 random_url() ->
     "https://" ++ random_domain() ++ "/" ++ random_string(20).
 
 random_domain() ->
-	lists:nth(random:uniform(length(?DOMAINS)), ?DOMAINS).
+    lists:nth(random:uniform(length(?DOMAINS)), ?DOMAINS).
 
 random_string(Length) ->
     AllowedChars = "abcdefghijklmnopqrstuvwxyz",

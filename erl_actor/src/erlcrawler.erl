@@ -43,19 +43,22 @@ total_crawl_urls(Pid) when is_pid(Pid) ->
     end.
 
 %%% Server functions
-init() -> loop(0).
+init() -> 
+    {ok, DownloaderPid} = downloader:start_link(),
+    {ok, IndexerPid} = indexer:start_link(),
+    loop(DownloaderPid, IndexerPid, 0).
 
 %%% Main server loop
-loop(N) ->
+loop(DownloaderPid, IndexerPid, N) ->
     receive
         {crawl, Req} ->
-            ServerPid = self(),
-            spawn_link(fun() -> handle_crawl(ServerPid, Req) end),
+            CrawlerPid = self(),
+            spawn_link(fun() -> handle_crawl(CrawlerPid, Req, DownloaderPid, IndexerPid) end),
             debug_print(N),
-            loop(N+1);
+            loop(DownloaderPid, IndexerPid, N+1);
         {total, Pid} ->
             Pid ! {total_reply, Pid, N},
-            loop(N);
+            loop(DownloaderPid, IndexerPid, N);
         terminate ->
             ok
     end.
@@ -96,7 +99,7 @@ do_crawl_urls(Pid, Depth, [], [Req|T], Timeout, ChildURLs) when is_pid(Pid) ->
 
 
 %%% Internal server functions called by actor to process the crawling request
-handle_crawl(ServerPid, Req) ->
+handle_crawl(CrawlerPid, Req, DownloaderPid, IndexerPid) ->
     Res = make_result(Req),
     ClientPid = Req#request.clientPid,
     Url = Req#request.url,
@@ -104,16 +107,16 @@ handle_crawl(ServerPid, Req) ->
     Depth = Req#request.depth,
     Timeout = Req#request.timeout,
 
-	case download(Url) of
+    case downloader:download(DownloaderPid, Url) of
         {ok, Contents} ->
-	        Contents1 = jsrender(Url, Contents),
-	        Changed = has_content_changed(Url, Contents1),
-	        Spam = is_spam(Url, Contents1),
-	        if Changed and not Spam ->
-			    index(Url, Contents1),
-			    Urls = parse_urls(Url, Contents1),
+        {ok, Contents1} = downloader:jsrender(DownloaderPid, Url, Contents),
+        Changed = has_content_changed(Url, Contents1),
+        Spam = is_spam(Url, Contents1),
+        if Changed and not Spam ->
+            indexer:index(IndexerPid, Url, Contents1),
+        Urls = parse_urls(Url, Contents1),
                 %% Crawling child urls synchronously before returning
-                ChildURLs = do_crawl_urls(ServerPid, Depth+1, Urls, [], Timeout, 0) + 1,
+                ChildURLs = do_crawl_urls(CrawlerPid, Depth+1, Urls, [], Timeout, 0) + 1,
                 Res1 = Res#result{completed_at=erlang:system_time(millisecond), child_urls=ChildURLs},
                 ClientPid ! {crawl_done, Ref, Res1};
             true ->
@@ -127,46 +130,26 @@ handle_crawl(ServerPid, Req) ->
     ok.
 
 %%%%%%%%%%%%%%% INTERNAL METHODS FOR CRAWLING %%%%%%%%%%%%%%%%
-download(_Url) ->
-    % TODO check robots.txt and throttle policies
-    % TODO add timeout for slow websites and linearize requests to the same domain to prevent denial of service attack
-    % random:seed(erlang:phash2([node()]), erlang:monotonic_time(), erlang:unique_integer()),
-	% R = random:uniform(10),
-	%if R < 0 ->
-    %    download_error;
-    %true ->
-    %    {ok, random_string(100)}
-    %end.
-    {ok, random_string(100)}.
-
-jsrender(_Url, _Contents) ->
- 	% for SPA apps that use javascript for rendering contents 
-    ok.
-
-index(_Url, _Contents) ->
- 	% apply standardize, stem, ngram, etc for indexing
-    ok.
-
 parse_urls(_Url, _Contents) ->
-	% tokenize contents and extract href/image/script urls
+    % tokenize contents and extract href/image/script urls
     random_urls(?MAX_URL).
 
 random_urls(N) ->
     [random_url() || _ <- lists:seq(1, N)].
 
 has_content_changed(_Url, _Contents) ->
- 	% calculate hash digest and compare it with last digest
+     % calculate hash digest and compare it with last digest
     true.
 
 is_spam(_Url, _Contents) ->
- 	% apply standardize, stem, ngram, etc for indexing
+     % apply standardize, stem, ngram, etc for indexing
     false.
 
 random_url() ->
     "https://" ++ random_domain() ++ "/" ++ random_string(20).
 
 random_domain() ->
-	lists:nth(random:uniform(length(?DOMAINS)), ?DOMAINS).
+    lists:nth(random:uniform(length(?DOMAINS)), ?DOMAINS).
 
 random_string(Length) ->
     AllowedChars = "abcdefghijklmnopqrstuvwxyz",

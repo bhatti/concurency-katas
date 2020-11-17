@@ -1,6 +1,7 @@
 package concurrency.utils
 
 import concurrency.domain.Request
+import kotlinx.coroutines.runBlocking
 
 class CrawlerUtils(val maxDepth: Int) {
     val DOMAINS = listOf("ab.com", "bc.com", "cd.com", "de.com", "ef.com", "fg.com",
@@ -11,30 +12,32 @@ class CrawlerUtils(val maxDepth: Int) {
 
     // method to crawl a single url
     fun handleCrawl(req: Request): List<String> {
-        val contents = download(req.url)
-        if (req.depth + 1 < maxDepth &&
-                hasContentsChanged(req.url, contents) &&
-                !isSpam(req.url, contents)) {
-            index(req.url, contents)
-            return parseURLs(req.url, contents)
-        } else {
-            return listOf()
+        return runBlocking {
+            val contents = download(req.url)
+            if (req.depth + 1 < maxDepth &&
+                    hasContentsChanged(req.url, contents) &&
+                    !isSpam(req.url, contents)) {
+                index(req.url, contents)
+                return@runBlocking parseURLs(req.url, contents)
+            } else {
+                return@runBlocking listOf()
+            }
         }
     }
 
-    private fun download(url: String): String {
+    suspend private fun download(url: String): String {
         // TODO check robots.txt and throttle policies
         // TODO add timeout for slow websites and linearize requests to the same domain to prevent denial of service attack
         // invoke jsrender to generate dynamic content
         return jsrender(url, randomString(100))
     }
 
-    private fun jsrender(_url: String, contents: String): String {
+    suspend private fun jsrender(_url: String, contents: String): String {
         // for SPA apps that use javascript for rendering contents
         return contents
     }
 
-    private fun index(_url: String, _contents: String) {
+    suspend private fun index(_url: String, _contents: String) {
         // apply standardize, stem, ngram, etc for indexing
     }
 

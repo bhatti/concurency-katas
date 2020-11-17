@@ -6,16 +6,17 @@ defmodule CrawlerTest do
   @max_wait_messages 19032
 
   test "crawling urls" do
+    timeout = 5 * 60 * 1000
     started = System.system_time(:millisecond)
     {:ok, pid} = Crawler.start_link(@max_processes)
-    Crawler.crawl_urls(pid, @root_urls)
+    Crawler.crawl_urls(pid, @root_urls, timeout)
     wait_until_total_crawl_urls(pid, @max_wait_messages, started)
   end
 
   defp wait_until_total_crawl_urls(pid, max, started) do
     receive do {:waiting} -> wait_until_total_crawl_urls(pid, max, started)
     after 100 ->
-      n = Crawler.total_crawl_urls(pid)
+      n = Crawler.total_crawl_urls(pid, 1000)
       if n >= max do
         elapsed = System.system_time(:millisecond) - started
         IO.puts("Crawled URLs in millis: #{n} #{elapsed}")

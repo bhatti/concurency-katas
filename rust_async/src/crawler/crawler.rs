@@ -18,18 +18,20 @@ const MAX_URLS: u8 = 11;
 pub struct Request {
     pub url: String,
     pub depth: u8,
+    pub timeout: Duration,
     pub created_at: u128,
 }
 
 impl Request {
-    pub fn new(url: String, depth: u8) -> Request {
+    pub fn new(url: String, depth: u8, timeout: Duration) -> Request {
         let epoch = SystemTime::now().duration_since(UNIX_EPOCH).expect("epoch failed").as_millis();
-        Request{url: url.to_string(), depth: depth, created_at: epoch}
+        Request{url: url.to_string(), depth: depth, timeout: timeout, created_at: epoch}
     }
 }
 
 #[derive(Debug)]
 pub enum CrawlError {
+    Unknown,
     MaxDepthReached,
     DownloadError,
     ParseError,
@@ -47,6 +49,7 @@ impl fmt::Display for CrawlError {
             CrawlError::ParseError => write!(f, "ParseError"),
             CrawlError::IndexError => write!(f, "IndexError"),
             CrawlError::ContentsNotChanged => write!(f, "ContentsNotChanged"),
+            CrawlError::Unknown => write!(f, "Unknown"),
         }
     }
 }
@@ -68,7 +71,7 @@ fn do_crawl(urls: Vec<String>, timeout_dur: Duration, depth: u8) -> usize {
     for u in urls {
         size += 1;
         futures.push(async move {
-            let child_urls = match handle_crawl(Request::new(u, depth)) {
+            let child_urls = match handle_crawl(Request::new(u, depth, timeout_dur)) {
                 Ok(urls) => urls,
                 Err(_err) => [].to_vec(),
             };
@@ -91,39 +94,47 @@ fn do_crawl(urls: Vec<String>, timeout_dur: Duration, depth: u8) -> usize {
 
 // method to crawl a single url
 fn handle_crawl(req: Request) -> Result<Vec<String>, CrawlError> {
-    let contents = match download(&req.url) {
-        Ok(data) => data,
-        Err(_err) => return Err(CrawlError::DownloadError),
-    };
+    let res: Result<Vec<String>, CrawlError> = task::block_on(
+        async {
+            let contents = match download(&req.url).await {
+                Ok(data) => data,
+                Err(_err) => return Err(CrawlError::DownloadError),
+            };
 
-    if has_contents_changed(&req.url, &contents) && !is_spam(&req.url, &contents) {
-        let urls = match index(&req.url, &contents) {
-            Ok(_) =>
-                match parse_urls(&req.url, &contents) {
-                    Ok(urls) => urls,
-                    Err(_err) => return Err(CrawlError::ParseError),
-                },
-            Err(_err) => return Err(CrawlError::IndexError),
-        };
-        Ok(urls)
-    } else {
-        Err(CrawlError::ContentsNotChanged)
+            if has_contents_changed(&req.url, &contents) && !is_spam(&req.url, &contents) {
+                let urls = match index(&req.url, &contents).await {
+                    Ok(_) =>
+                        match parse_urls(&req.url, &contents) {
+                            Ok(urls) => urls,
+                            Err(_err) => return Err(CrawlError::ParseError),
+                        },
+                    Err(_err) => return Err(CrawlError::IndexError),
+                };
+                return Ok(urls)
+            } else {
+                return Err(CrawlError::ContentsNotChanged)
+            }
+        }
+    );
+    match res {
+        Ok(list) => return Ok(list),
+        Err(err) => return Err(err),
     }
 }
 
-fn download(url: &str) -> Result<String, CrawlError> {
+async fn download(url: &str) -> Result<String, CrawlError> {
     // TODO check robots.txt and throttle policies
     // TODO add timeout for slow websites and linearize requests to the same domain to prevent denial of service attack
     // invoke jsrender to generate dynamic content
-    jsrender(url, &random_string(100))
+    jsrender(url, &random_string(100)).await
 }
 
-fn jsrender(_url: &str, contents: &str) -> Result<String, CrawlError> {
+async fn jsrender(_url: &str, contents: &str) -> Result<String, CrawlError> {
     // for SPA apps that use javascript for rendering contents
     Ok(contents.to_string())
 }
 
-fn index(_url: &str, _contents: &str) -> Result<bool, CrawlError> {
+async fn index(_url: &str, _contents: &str) -> Result<bool, CrawlError> {
     // apply standardize, stem, ngram, etc for indexing
     Ok(true)
 }

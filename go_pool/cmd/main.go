@@ -12,7 +12,7 @@ const MAX_MESSAGES = 14443
 
 func main() {
 	started := time.Now()
-	timeout := time.Duration(5 * time.Second)
+	timeout := time.Duration(6 * time.Second)
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	c := crawler.New(ctx)

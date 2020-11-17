@@ -5,8 +5,9 @@ defmodule CrawlerTest do
   @expected_urls 19032
 
   test "crawling urls" do
+    timeout = 5 * 60 * 1000
     started = System.system_time(:millisecond)
-    res = Crawler.crawl_urls(@root_urls)
+    res = Crawler.crawl_urls(@root_urls, timeout)
     sum = Enum.reduce(res, 0, &(&1 + &2))
     elapsed = System.system_time(:millisecond) - started
     IO.puts("Crawled URLs in millis: #{sum} #{elapsed}")

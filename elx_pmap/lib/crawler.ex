@@ -4,54 +4,39 @@ defmodule Crawler do
   @allowed_chars "abcdefghijklmnopqrstuvwxyz"
   @max_depth 4
   @max_url 11
-  @timeout 1200005
 
   @moduledoc """
   Documentation for Crawler.
   """
 
   ## Client API
-  def crawl_urls(urls) when is_list(urls) do
-    crawl_urls(urls, 0)
+  def crawl_urls(urls, timeout) when is_list(urls) do
+    {:ok, downloader_pid} = Downloader.start_link()
+    {:ok, indexer_pid} = Indexer.start_link()
+    crawl_urls(urls, downloader_pid, indexer_pid, 0, timeout)
   end
 
-  def crawl_urls(urls, depth) when is_list(urls) do
+  def crawl_urls(urls, downloader_pid, indexer_pid, depth, timeout) when is_list(urls) and is_pid(downloader_pid) and is_pid(indexer_pid) and is_integer(depth) and is_integer(timeout) do
     if depth < @max_depth do
-      requests = urls |> Enum.map(&(Request.new(&1, depth)))
-      Parallel.pmap(requests, &(handle_crawl/1), @timeout)
+      requests = urls |> Enum.map(&(Request.new(&1, downloader_pid, indexer_pid, depth, timeout)))
+      Parallel.pmap(requests, &(handle_crawl/1), timeout)
     else
       []
     end
   end
 
   # Internal private methods
-  def handle_crawl(req) do
-    contents = download(req.url)
-    new_contents = jsrender(req.url, contents)
+  defp handle_crawl(req) do
+    {:ok, contents} = Downloader.download(req.downloader_pid, req.url, req.timeout)
+    {:ok, new_contents} = Downloader.jsrender(req.downloader_pid, req.url, contents, req.timeout)
     if has_content_changed(req.url, new_contents) and !is_spam(req.url, new_contents) do
-      index(req.url, new_contents)
-	  urls = parse_urls(req.url, new_contents)
-      res = Crawler.crawl_urls(urls, req.depth+1)
+      Indexer.index(req.indexer_pid, req.url, new_contents, req.timeout)
+      urls = parse_urls(req.url, new_contents)
+      res = Crawler.crawl_urls(urls, req.downloader_pid, req.indexer_pid, req.depth+1, req.timeout)
       Enum.reduce(res, 0, &(&1 + &2)) + 1
     else
       0
     end
-  end
-
-  defp download(_url) do
-    # TODO check robots.txt and throttle policies
-    # TODO add timeout for slow websites and linearize requests to the same domain to prevent denial of service attack
-    random_string(100)
-  end
-
-  defp jsrender(_url, _contents) do
-    # for SPA apps that use javascript for rendering contents
-    :ok
-  end
-
-  defp index(_url, _contents) do
-    # apply standardize, stem, ngram, etc for indexing
-    :ok
   end
 
   defp parse_urls(_Url, _Contents) do
