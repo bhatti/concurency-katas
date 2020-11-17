@@ -15,8 +15,8 @@ type AsyncAwaiter interface {
 	Await(ctx context.Context, timeout time.Duration) (interface{}, error)
 }
 
-// Promise encapsulates request to process asynchronously
-type Promise struct {
+// Future encapsulates request to process asynchronously
+type Future struct {
 	id      string
 	payload interface{}
 	outQ    chan Result
@@ -40,25 +40,25 @@ func New(handler AsyncHandler) *Async {
 }
 
 func (a *Async) Async(ctx context.Context, payload interface{}) AsyncAwaiter {
-	p := &Promise{id: uuid.New().String(), payload: payload, outQ: make(chan Result, 1)}
-	go p.run(ctx, a.handler) // run handler asynchronously
+	future := &Future{id: uuid.New().String(), payload: payload, outQ: make(chan Result, 1)}
+	go future.run(ctx, a.handler) // run handler asynchronously
 	return p
 }
 
-func (p Promise) run(ctx context.Context, handler AsyncHandler) {
+func (f Future) run(ctx context.Context, handler AsyncHandler) {
 	go func() {
-		payload, err := handler(ctx, p.payload)
-		p.outQ <- Result{id: p.id, payload: payload, err: err} // out channel is buffered by 1
-		close(p.outQ)
+		payload, err := handler(ctx, f.payload)
+		f.outQ <- Result{id: f.id, payload: payload, err: err} // out channel is buffered by 1
+		close(f.outQ)
 	}()
 }
 
-func (p Promise) Await(ctx context.Context, timeout time.Duration) (payload interface{}, err error) {
+func (f Future) Await(ctx context.Context, timeout time.Duration) (payload interface{}, err error) {
 	payload = nil
 	select {
 	case <-ctx.Done():
 		err = errors.New("async_cancelled")
-	case res := <-p.outQ:
+	case res := <-f.outQ:
 		payload = res.payload
 		err = res.err
 	case <-time.After(timeout):

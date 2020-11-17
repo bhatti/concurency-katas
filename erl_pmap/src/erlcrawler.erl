@@ -1,5 +1,5 @@
 %%%-------------------------------------------------------------------
-%% @doc erlcrawler implmenetation using pmap
+%% @doc erlcrawler implmenetation of a simple web crawler using pmap
 %% @end
 %%%-------------------------------------------------------------------
 

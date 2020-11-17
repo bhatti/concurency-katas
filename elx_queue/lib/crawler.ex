@@ -1,3 +1,7 @@
+###-------------------------------------------------------------------
+## A fake implementation of web crawler using shared queue
+###-------------------------------------------------------------------
+
 defmodule Crawler do
   @max_depth 4
 

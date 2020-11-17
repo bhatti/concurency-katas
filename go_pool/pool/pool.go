@@ -31,12 +31,14 @@ type Result struct {
 	err     error
 }
 
+// Worker structure defines inbound channel to receive request and lambda function to execute
 type Worker struct {
 	id                   int
 	handler              Handler
 	workerRequestChannel chan *Request
 }
 
+// NewWorker creates new worker
 func NewWorker(id int, handler Handler) Worker {
 	return Worker{
 		id:                   id,
@@ -57,7 +59,7 @@ func (w Worker) start(ctx context.Context, workersReadyPool chan chan *Request, 
 			case req := <-w.workerRequestChannel:
 				payload, err := w.handler(ctx, req.payload)
 				req.outQ <- Result{id: req.id, payload: payload, err: err} // out channel is buffered by 1
-			//close(req.outQ) // optionally close as we only need a single reply
+				close(req.outQ)
 			case <-done:
 				return
 			}
@@ -74,6 +76,7 @@ type WorkPool struct {
 	handler             Handler
 }
 
+// New Creates new async structure
 func New(handler Handler, size int) *WorkPool {
 	async := &WorkPool{
 		size:                size,
@@ -84,6 +87,7 @@ func New(handler Handler, size int) *WorkPool {
 	return async
 }
 
+// Start - starts up workers and internal goroutine to receive requests
 func (p *WorkPool) Start(ctx context.Context) {
 	for w := 1; w <= p.size; w++ {
 		worker := NewWorker(w, p.handler)
@@ -92,6 +96,7 @@ func (p *WorkPool) Start(ctx context.Context) {
 	go p.dispatch(ctx)
 }
 
+// Add request to process
 func (p *WorkPool) Add(ctx context.Context, payload interface{}) Awaiter {
 	// Adding request to process
 	req := &Request{id: uuid.New().String(), payload: payload, outQ: make(chan Result, 1)}
@@ -101,6 +106,7 @@ func (p *WorkPool) Add(ctx context.Context, payload interface{}) Awaiter {
 	return req
 }
 
+// Await for reply -- you can only call this once
 func (r Request) Await(ctx context.Context, timeout time.Duration) (payload interface{}, err error) {
 	select {
 	case <-ctx.Done():
@@ -110,12 +116,13 @@ func (r Request) Await(ctx context.Context, timeout time.Duration) (payload inte
 		err = res.err
 	case <-time.After(timeout):
 		payload = nil
-		err = errors.New(fmt.Sprintf("async_timedout %v", timeout))
+		err = fmt.Errorf("async_timedout %v", timeout)
 	}
 
 	return
 }
 
+// Stop - stops thread pool
 func (p *WorkPool) Stop() {
 	close(p.pendingRequestQueue)
 	go func() {
@@ -123,7 +130,7 @@ func (p *WorkPool) Stop() {
 	}()
 }
 
-// Receiving requests from inbound jobQuee and forward it to the worker's workerRequestChannel
+// Receiving requests from inbound channel and forward it to the worker's workerRequestChannel
 func (p *WorkPool) dispatch(ctx context.Context) {
 	for {
 		select {
@@ -133,9 +140,9 @@ func (p *WorkPool) dispatch(ctx context.Context) {
 			return
 		case req := <-p.pendingRequestQueue:
 			go func(req *Request) {
-				// Find next worker
+				// Find next ready worker
 				workerRequestChannel := <-p.workersReadyPool
-				// dispatch the request to next worker
+				// dispatch the request to next ready worker
 				workerRequestChannel <- req
 			}(req)
 		}

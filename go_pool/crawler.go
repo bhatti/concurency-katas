@@ -1,3 +1,7 @@
+//--------------------------------------------------------------------------
+// fake web crawler using async API built on top of goroutines and channels
+//--------------------------------------------------------------------------
+
 package crawler
 
 import (

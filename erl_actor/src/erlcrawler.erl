@@ -1,5 +1,5 @@
 %%%-------------------------------------------------------------------
-%% @doc erlcrawler implmenetation using processes
+%% @doc erlcrawler fake implmenetation of web crawler using processes
 %% @end
 %%%-------------------------------------------------------------------
 
