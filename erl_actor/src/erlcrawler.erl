@@ -12,8 +12,32 @@
 
 -define(MAX_DEPTH, 4).
 -define(MAX_URL, 11).
--define(DOMAINS, ["ab.com", "bc.com", "cd.com", "de.com", "ef.com", "fg.com", "gh.com", "hi.com", "ij.com", "jk.com", "kl.com", "lm.com", "mn.com",
-        "no.com", "op.com", "pq.com", "qr.com", "rs.com", "st.com", "tu.com", "uv.com", "vw.com", "wx.com", "xy.com", "yz.com"]).
+-define(DOMAINS, [
+  "ab.com",
+  "bc.com",
+  "cd.com",
+  "de.com",
+  "ef.com",
+  "fg.com",
+  "gh.com",
+  "hi.com",
+  "ij.com",
+  "jk.com",
+  "kl.com",
+  "lm.com",
+  "mn.com",
+  "no.com",
+  "op.com",
+  "pq.com",
+  "qr.com",
+  "rs.com",
+  "st.com",
+  "tu.com",
+  "uv.com",
+  "vw.com",
+  "wx.com",
+  "xy.com",
+  "yz.com"]).
 
 make_request(ClientPid, Ref, Url, Depth, Timeout) ->
     #request{clientPid=ClientPid, ref=Ref, url=Url, depth=Depth, timeout=Timeout}.
@@ -33,6 +57,8 @@ start_link() ->
 %%% Urls - list of urls to crawl
 %%% Timeout - max timeout
 crawl_urls(Pid, Urls, Timeout) when is_pid(Pid), is_list(Urls)  ->
+    %% Boundary for concurrency and it will not return until all
+    %% child URLs are crawled up to MAX_DEPTH limit.
     do_crawl_urls(Pid, 0, Urls, [], Timeout, 0).
 
 total_crawl_urls(Pid) when is_pid(Pid) ->
@@ -43,7 +69,7 @@ total_crawl_urls(Pid) when is_pid(Pid) ->
     end.
 
 %%% Server functions
-init() -> 
+init() ->
     {ok, DownloaderPid} = downloader:start_link(),
     {ok, IndexerPid} = indexer:start_link(),
     loop(DownloaderPid, IndexerPid, 0).
@@ -113,7 +139,7 @@ handle_crawl(CrawlerPid, Req, DownloaderPid, IndexerPid) ->
         Changed = has_content_changed(Url, Contents1),
         Spam = is_spam(Url, Contents1),
         if Changed and not Spam ->
-            indexer:index(IndexerPid, Url, Contents1),
+            indexer:index(IndexerPid, Url, Contents1), % asynchronous call
         Urls = parse_urls(Url, Contents1),
                 %% Crawling child urls synchronously before returning
                 ChildURLs = do_crawl_urls(CrawlerPid, Depth+1, Urls, [], Timeout, 0) + 1,

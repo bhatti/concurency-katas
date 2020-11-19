@@ -13,8 +13,11 @@ class CrawlerWithCoroutines(val maxDepth: Int, val timeout: Long) : Crawler {
     private val logger = LoggerFactory.getLogger(CrawlerWithCoroutines::class.java)
     val crawlerUtils = CrawlerUtils(maxDepth)
 
+    // public method for crawling a list of urls using co-routines
     override fun crawl(urls: List<String>): Response {
         var res = Response()
+        // Boundary for concurrency and it will not return until all
+        // child URLs are crawled up to MAX_DEPTH limit.
         runBlocking {
             res.childURLs = crawl(urls, 0).childURLs
         }

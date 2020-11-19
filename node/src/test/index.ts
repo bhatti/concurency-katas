@@ -25,8 +25,8 @@ describe('crawler', async () => {
     const crawler = new Crawler();
     const res = await crawler.crawl(ROOT_URLS, timeout);
     const elapsed = new Date().getTime() - started;
-    console.log(`Crawl took ${elapsed} to process ${res.childURLs}`);
-    expect(res.childURLs).equal(EXPECTED_URLS);
+    console.log(`Crawl took ${elapsed} to process ${res}`);
+    expect(res).equal(EXPECTED_URLS);
   });
 
 });

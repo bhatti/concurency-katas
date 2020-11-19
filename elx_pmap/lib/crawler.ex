@@ -3,8 +3,32 @@
 ##--------------------------------------------------------------------------
 
 defmodule Crawler do
-  @domains ["ab.com", "bc.com", "cd.com", "de.com", "ef.com", "fg.com", "gh.com", "hi.com", "ij.com", "jk.com", "kl.com", "lm.com", "mn.com",
-        "no.com", "op.com", "pq.com", "qr.com", "rs.com", "st.com", "tu.com", "uv.com", "vw.com", "wx.com", "xy.com", "yz.com"]
+  @domains [
+    "ab.com",
+    "bc.com",
+    "cd.com",
+    "de.com",
+    "ef.com",
+    "fg.com",
+    "gh.com",
+    "hi.com",
+    "ij.com",
+    "jk.com",
+    "kl.com",
+    "lm.com",
+    "mn.com",
+    "no.com",
+    "op.com",
+    "pq.com",
+    "qr.com",
+    "rs.com",
+    "st.com",
+    "tu.com",
+    "uv.com",
+    "vw.com",
+    "wx.com",
+    "xy.com",
+    "yz.com"]
   @allowed_chars "abcdefghijklmnopqrstuvwxyz"
   @max_depth 4
   @max_url 11
@@ -15,9 +39,16 @@ defmodule Crawler do
 
   ## Client API
   def crawl_urls(urls, timeout) when is_list(urls) do
+    ## Boundary for concurrency and it will not return until all
+    ## child URLs are crawled up to MAX_DEPTH limit.
+    ## Starting external services using OTP for downloading and indexing
     {:ok, downloader_pid} = Downloader.start_link()
     {:ok, indexer_pid} = Indexer.start_link()
-    crawl_urls(urls, downloader_pid, indexer_pid, 0, timeout)
+    res = crawl_urls(urls, downloader_pid, indexer_pid, 0, timeout)
+    ## Stopping external services using OTP for downloading and indexing
+    Process.exit(downloader_pid, :normal)
+    Process.exit(indexer_pid, :normal)
+    res
   end
 
   def crawl_urls(urls, downloader_pid, indexer_pid, depth, timeout) when is_list(urls) and is_pid(downloader_pid) and is_pid(indexer_pid) and is_integer(depth) and is_integer(timeout) do

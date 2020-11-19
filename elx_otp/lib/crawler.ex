@@ -19,10 +19,14 @@ defmodule Crawler do
     GenServer.call(pid, {:total_crawl_urls}, 30000)
   end
 
+  ### Public client APIs
   def crawl_urls(pid, urls) when is_pid(pid) and is_list(urls) do
+    ## Boundary for concurrency and it will not return until all
+    ## child URLs are crawled up to MAX_DEPTH limit.
     crawl_urls(pid, urls, 0, self())
   end
 
+  ### Internal client APIs
   def crawl_urls(pid, urls, depth, clientPid) when is_pid(pid) and is_list(urls) do
     if depth < @max_depth do
       requests = urls |> Enum.map(&(Request.new(&1, depth, clientPid)))

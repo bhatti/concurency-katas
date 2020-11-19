@@ -14,14 +14,20 @@ class CrawlerCancelable(val maxDepth: Int, val timeout: Long) : Crawler {
     private val logger = LoggerFactory.getLogger(CrawlerWithCoroutines::class.java)
     val crawlerUtils = CrawlerUtils(maxDepth)
 
+    // public method for crawling a list of urls to show cancel operation
+    // internal method will call cancel instead of await so this method will
+    // fail.
     override fun crawl(urls: List<String>): Response {
         var res = Response()
+        // Boundary for concurrency and it will not return until all
+        // child URLs are crawled up to MAX_DEPTH limit.
         runBlocking {
             res.childURLs = crawl(urls, 0).childURLs
         }
         return res
     }
 
+    ////////////////// Internal methods
     suspend private fun crawl(urls: List<String>, depth: Int): Response {
         var res = Response()
         if (depth >= maxDepth) {
@@ -29,7 +35,6 @@ class CrawlerCancelable(val maxDepth: Int, val timeout: Long) : Crawler {
         }
         var size = AtomicInteger()
 
-        val jobs = mutableListOf<Deferred<Int>>()
         withTimeout(timeout) {
             val jobs = mutableListOf<Deferred<Int>>()
             for (u in urls) {

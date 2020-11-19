@@ -18,6 +18,8 @@ defmodule Crawler do
 
   ## crawl list of url
   def crawl_urls(pid, urls, timeout) when is_pid(pid) and is_list(urls) and is_integer(timeout) do
+    ## Boundary for concurrency and it will not return until all
+    ## child URLs are crawled up to MAX_DEPTH limit.
     crawl_urls(pid, urls, 0, self(), timeout)
   end
 
@@ -26,6 +28,12 @@ defmodule Crawler do
     GenServer.call(pid, {:total_crawl_urls}, timeout)
   end
 
+  ## dequeue returns pops top request from the queue and returns it
+  def dequeue(pid) when is_pid(pid) do
+    GenServer.call(pid, {:dequeue})
+  end
+
+  ###########################################
   ## internal api to crawl urls
   def crawl_urls(pid, urls, depth, clientPid, timeout) when is_pid(pid) and is_list(urls) and is_pid(clientPid) and is_integer(timeout) do
     if depth < @max_depth do
@@ -36,12 +44,7 @@ defmodule Crawler do
     end
   end
 
-  ## dequeue returns pops top request from the queue and returns it
-  def dequeue(pid) when is_pid(pid) do
-    GenServer.call(pid, {:dequeue})
-  end
-
-  ################### 
+  ###########################################
   ## init method create pool of workers based on given size
   def init({size, downloader_pid, indexer_pid}) when is_integer(size) and is_pid(downloader_pid) and is_pid(indexer_pid) do
     Process.flag(:trap_exit, true)

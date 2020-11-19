@@ -12,9 +12,33 @@
 
 -define(MAX_DEPTH, 4).
 -define(MAX_URL, 11).
--define(ROOT_URLS, ["a.com", "b.com", "c.com", "d.com", "e.com", "f.com", "g.com", "h.com", "i.com", "j.com", "k.com", "l.com", "n.com"]).
--define(DOMAINS, ["ab.com", "bc.com", "cd.com", "de.com", "ef.com", "fg.com", "gh.com", "hi.com", "ij.com", "jk.com", "kl.com", "lm.com", "mn.com",
-        "no.com", "op.com", "pq.com", "qr.com", "rs.com", "st.com", "tu.com", "uv.com", "vw.com", "wx.com", "xy.com", "yz.com"]).
+-define(DOMAINS, [
+  "ab.com",
+  "bc.com",
+  "cd.com",
+  "de.com",
+  "ef.com",
+  "fg.com",
+  "gh.com",
+  "hi.com",
+  "ij.com",
+  "jk.com",
+  "kl.com",
+  "lm.com",
+  "mn.com",
+  "no.com",
+  "op.com",
+  "pq.com",
+  "qr.com",
+  "rs.com",
+  "st.com",
+  "tu.com",
+  "uv.com",
+  "vw.com",
+  "wx.com",
+  "xy.com",
+  "yz.com"]).
+
 
 make_request(Url, Depth, Timeout, DownloaderPid, IndexerPid) ->
     #request{url=Url, depth=Depth, timeout=Timeout, downloader=DownloaderPid, indexer=IndexerPid}.
@@ -28,10 +52,19 @@ make_result(Req) ->
 %%% Urls - list of urls to crawl
 %%% Timeout - max timeout
 crawl_urls(Urls, Timeout) when is_list(Urls), is_integer(Timeout) ->
+    %% Boundary for concurrency and it will not return until all
+    %% child URLs are crawled up to MAX_DEPTH limit.
+    %% Starting external services using OTP for downloading and indexing
     {ok, DownloaderPid} = downloader:start_link(),
     {ok, IndexerPid} = indexer:start_link(),
-    crawl_urls(Urls, 0, Timeout, DownloaderPid, IndexerPid).
+    Res = crawl_urls(Urls, 0, Timeout, DownloaderPid, IndexerPid),
+    %% Stopping external services using OTP for downloading and indexing
+    exit(DownloaderPid, normal),
+    exit(IndexerPid, normal),
+    Res.
 
+
+%% Internal APIs
 crawl_urls(_, ?MAX_DEPTH, _, _, _) ->
     [];
 crawl_urls(Urls, Depth, Timeout, DownloaderPid, IndexerPid) when is_list(Urls), is_integer(Timeout), is_integer(Depth), is_pid(DownloaderPid), is_pid(IndexerPid) ->
@@ -98,5 +131,7 @@ random_string(Length) ->
 %%% deconstruct size from array of counts such as [{ok, 3}, {ok, 5}...]
 ok_size([{ok, N}|T], Sum) ->
     ok_size(T, Sum+N);
+ok_size([_|T], Sum) ->
+    ok_size(T, Sum);
 ok_size([], Sum) ->
     Sum.

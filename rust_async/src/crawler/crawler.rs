@@ -58,11 +58,15 @@ impl fmt::Display for CrawlError {
 }
 
 
+//////// PUBLIC METHODS
 // crawling a collection of urls
 pub fn crawl(urls: Vec<String>, timeout_dur: Duration) -> usize {
+    // Boundary for concurrency and it will not return until all
+    // child URLs are crawled up to MAX_DEPTH limit.
     return do_crawl(urls, timeout_dur, 0);
 }
 
+//////// PRIVATE METHODS
 fn do_crawl(urls: Vec<String>, timeout_dur: Duration, depth: u8) -> usize {
     if depth >= MAX_DEPTH {
         return 0

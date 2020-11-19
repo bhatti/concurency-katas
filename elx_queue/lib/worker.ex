@@ -3,8 +3,32 @@ defmodule Worker do
   Documentation for crawling worker that dequeues top request from shared queue and work on it. It then sends reply back to client using its pid.
   """
   @max_url 11
-  @domains ["ab.com", "bc.com", "cd.com", "de.com", "ef.com", "fg.com", "gh.com", "hi.com", "ij.com", "jk.com", "kl.com", "lm.com", "mn.com",
-        "no.com", "op.com", "pq.com", "qr.com", "rs.com", "st.com", "tu.com", "uv.com", "vw.com", "wx.com", "xy.com", "yz.com"]
+  @domains [
+    "ab.com",
+    "bc.com",
+    "cd.com",
+    "de.com",
+    "ef.com",
+    "fg.com",
+    "gh.com",
+    "hi.com",
+    "ij.com",
+    "jk.com",
+    "kl.com",
+    "lm.com",
+    "mn.com",
+    "no.com",
+    "op.com",
+    "pq.com",
+    "qr.com",
+    "rs.com",
+    "st.com",
+    "tu.com",
+    "uv.com",
+    "vw.com",
+    "wx.com",
+    "xy.com",
+    "yz.com"]
   @allowed_chars "abcdefghijklmnopqrstuvwxyz"
 
   # Client APIs

@@ -55,6 +55,8 @@ func New(ctx context.Context) *Crawler {
 
 // Crawls list of URLs with specified depth
 func (c *Crawler) Crawl(ctx context.Context, urls []string, timeout time.Duration) (int, error) {
+	// Boundary for concurrency and it will not return until all
+	// child URLs are crawled up to MAX_DEPTH limit.
 	return c.crawl(ctx, urls, 0, timeout)
 }
 

@@ -42,7 +42,7 @@ func New(handler AsyncHandler) *Async {
 func (a *Async) Async(ctx context.Context, payload interface{}) AsyncAwaiter {
 	future := &Future{id: uuid.New().String(), payload: payload, outQ: make(chan Result, 1)}
 	go future.run(ctx, a.handler) // run handler asynchronously
-	return p
+	return future
 }
 
 func (f Future) run(ctx context.Context, handler AsyncHandler) {
