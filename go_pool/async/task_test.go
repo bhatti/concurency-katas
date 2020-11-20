@@ -9,6 +9,32 @@ import (
 	"time"
 )
 
+func fib(n uint) uint64 {
+	if n <= 1 {
+		return uint64(n)
+	}
+	return fib(n-1) + fib(n-2)
+}
+
+func TestAsyncWithSleep(t *testing.T) {
+	started := time.Now()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(10*time.Second))
+	defer cancel()
+	handler := func(ctx context.Context, payload interface{}) (interface{}, error) {
+		return fib(10000), nil
+	}
+	taskQueue := New(handler)
+	future := taskQueue.Async(ctx, 10)
+	_, err := future.Await(ctx, time.Duration(10*time.Millisecond))
+	elapsed := time.Since(started)
+	log.Printf("TestAsyncWithSleep took %s", elapsed)
+	if err == nil {
+		t.Errorf("Expected error")
+	} else if !strings.Contains(err.Error(), "async_timedout") {
+		t.Errorf("Expected timeout error but was %v", err)
+	}
+}
+
 func TestAsyncWithTimeout(t *testing.T) {
 	started := time.Now()
 	timeout := time.Duration(10 * time.Millisecond)
@@ -37,7 +63,7 @@ func TestAsyncWithTimeout(t *testing.T) {
 		}
 	}
 	elapsed := time.Since(started)
-	log.Printf("TestAsync took %s", elapsed)
+	log.Printf("TestAsyncWithTimeout took %s", elapsed)
 	if savedError == nil {
 		t.Errorf("Expected error")
 	} else if !strings.Contains(savedError.Error(), "async_cancelled") {
@@ -73,7 +99,7 @@ func TestAsyncWithFailure(t *testing.T) {
 		}
 	}
 	elapsed := time.Since(started)
-	log.Printf("TestAsync took %s", elapsed)
+	log.Printf("TestAsyncWithFailure took %s", elapsed)
 	expected := 1 + 9
 	if sum != expected {
 		t.Errorf("Expected %v but was %v", expected, sum)
