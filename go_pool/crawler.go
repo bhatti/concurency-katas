@@ -20,10 +20,10 @@ const MAX_URLS = 11
 
 // Crawler is used for crawing URLs
 type Crawler struct {
-	taskQueue     *async.Async
-	downloader    *async.Async
-	jsrenderer    *async.Async
-	indexer       *async.Async
+	crawlTask     *async.AsyncTask
+	downloader    *async.AsyncTask
+	jsrenderer    *async.AsyncTask
+	indexer       *async.AsyncTask
 	totalMessages uint64
 }
 
@@ -46,7 +46,7 @@ func New(ctx context.Context) *Crawler {
 	indexer := func(ctx context.Context, payload interface{}) (interface{}, error) {
 		return 0, nil
 	}
-	crawler.taskQueue = async.New(crawlHandler)
+	crawler.crawlTask = async.New(crawlHandler)
 	crawler.downloader = async.New(downloader)
 	crawler.jsrenderer = async.New(renderer)
 	crawler.indexer = async.New(indexer)
@@ -98,7 +98,7 @@ func (c *Crawler) crawl(ctx context.Context, urls []string, depth int, timeout t
 	if depth < MAX_DEPTH {
 		futures := make([]async.AsyncAwaiter, 0)
 		for i := 0; i < len(urls); i++ {
-			futures = append(futures, c.taskQueue.Async(ctx, domain.NewRequest(urls[i], depth, timeout)))
+			futures = append(futures, c.crawlTask.Async(ctx, domain.NewRequest(urls[i], depth, timeout)))
 		}
 		sum := 0
 		var savedError error

@@ -29,17 +29,17 @@ type Result struct {
 	err     error
 }
 
-// Async - processes data asynchronously
-type Async struct {
+// AsyncTask - processes data asynchronously
+type AsyncTask struct {
 	handler AsyncHandler
 }
 
-func New(handler AsyncHandler) *Async {
-	async := &Async{handler: handler}
+func New(handler AsyncHandler) *AsyncTask {
+	async := &AsyncTask{handler: handler}
 	return async
 }
 
-func (a *Async) Async(ctx context.Context, payload interface{}) AsyncAwaiter {
+func (a *AsyncTask) Async(ctx context.Context, payload interface{}) AsyncAwaiter {
 	future := &Future{id: uuid.New().String(), payload: payload, outQ: make(chan Result, 1)}
 	go future.run(ctx, a.handler) // run handler asynchronously
 	return future
