@@ -32,7 +32,7 @@ impl Request {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub enum CrawlError {
     Unknown,
     MaxDepthReached,
@@ -40,6 +40,7 @@ pub enum CrawlError {
     ParseError,
     IndexError,
     ContentsNotChanged,
+    Timedout,
 }
 
 impl Error for CrawlError {}
@@ -52,6 +53,7 @@ impl fmt::Display for CrawlError {
             CrawlError::ParseError => write!(f, "ParseError"),
             CrawlError::IndexError => write!(f, "IndexError"),
             CrawlError::ContentsNotChanged => write!(f, "ContentsNotChanged"),
+            CrawlError::Timedout=> write!(f, "Timedout"),
             CrawlError::Unknown => write!(f, "Unknown"),
         }
     }
@@ -60,16 +62,24 @@ impl fmt::Display for CrawlError {
 
 //////// PUBLIC METHODS
 // crawling a collection of urls
-pub fn crawl(urls: Vec<String>, timeout_dur: Duration) -> usize {
+pub fn crawl(urls: Vec<String>, timeout_dur: Duration) -> Result<usize, CrawlError> {
     // Boundary for concurrency and it will not return until all
     // child URLs are crawled up to MAX_DEPTH limit.
-    return do_crawl(urls, timeout_dur, 0);
+    //
+    match task::block_on(
+        timeout(timeout_dur, async {
+            do_crawl(urls, timeout_dur, 0)
+        })
+    ) {
+        Ok(res) => res,
+        Err(_err) => Err(CrawlError::Timedout),
+    }
 }
 
 //////// PRIVATE METHODS
-fn do_crawl(urls: Vec<String>, timeout_dur: Duration, depth: u8) -> usize {
+fn do_crawl(urls: Vec<String>, timeout_dur: Duration, depth: u8) -> Result<usize, CrawlError> {
     if depth >= MAX_DEPTH {
-        return 0
+        return Ok(0)
     }
 
     let mut futures = Vec::new();
@@ -85,18 +95,18 @@ fn do_crawl(urls: Vec<String>, timeout_dur: Duration, depth: u8) -> usize {
             if child_urls.len() > 0 {
                 do_crawl(child_urls, timeout_dur, depth+1)
             } else {
-                0
+                Ok(0)
             }
         });
     }
-    let _ = task::block_on(
-        timeout(timeout_dur, async {
-            let res: Vec<usize> = join_all(futures).await;
-            size += res.iter().fold(0usize, |sum, n| sum + n);
-            Ok::<(), future::TimeoutError>(())
-        })
+    task::block_on(
+        async {
+            let res: Vec<Result<usize, CrawlError>> = join_all(futures).await;
+            let sizes: Vec<usize> = res.iter().map(|r| r.map_or(0, |n|n)).collect::<Vec<usize>>();
+            size += sizes.iter().fold(0usize, |sum, n| n+sum);
+        }
     );
-    size
+    Ok(size)
 }
 
 // method to crawl a single url

@@ -6,16 +6,16 @@ use crate::crawler::crawler::*;
 mod crawler;
 
 fn main() {
-    do_crawl();
+    let _ = do_crawl(8000);
 }
 
-fn do_crawl() -> usize {
+fn do_crawl(timeout: u64) -> Result<usize, CrawlError> {
     let start = Instant::now();
     let urls = vec!["a.com", "b.com", "c.com", "d.com", "e.com", "f.com", "g.com", "h.com", "i.com", "j.com", "k.com", "l.com", "n.com"].into_iter().map(|s| s.to_string()).collect();
-    let total_urls = crawl(urls, Duration::from_millis(8000));
+    let res = crawl(urls, Duration::from_millis(timeout));
     let duration = start.elapsed();
-    println!("Crawled {} urls in () is: {:?}", total_urls, duration);
-    total_urls
+    println!("Crawled {:?} urls in () is: {:?}", res, duration);
+    res
 }
 
 #[cfg(test)]
@@ -23,6 +23,9 @@ mod tests {
     use super::do_crawl;
     #[test]
     fn crawl_urls() {
-        assert_eq!(do_crawl(), 19032);
+        match do_crawl(8000) {
+            Ok(size) => assert_eq!(size, 19032),
+            Err(err) => assert!(false, format!("Unexpected error {:?}", err)),
+        }
     }
 }
