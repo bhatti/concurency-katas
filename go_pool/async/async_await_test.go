@@ -23,14 +23,13 @@ func TestAsyncWithSleep(t *testing.T) {
 	handler := func(ctx context.Context, payload interface{}) (interface{}, error) {
 		return fib(10000), nil
 	}
-	taskQueue := New(handler)
-	future := taskQueue.Async(ctx, 10)
+	future := Execute(ctx, handler, NoAbort, 10)
 	_, err := future.Await(ctx, time.Duration(10*time.Millisecond))
 	elapsed := time.Since(started)
-	log.Printf("TestAsyncWithSleep took %s", elapsed)
+	log.Printf("TestWithSleep took %s", elapsed)
 	if err == nil {
 		t.Errorf("Expected error")
-	} else if !strings.Contains(err.Error(), "async_timedout") {
+	} else if !strings.Contains(err.Error(), "timedout") {
 		t.Errorf("Expected timeout error but was %v", err)
 	}
 }
@@ -47,10 +46,10 @@ func TestAsyncWithTimeout(t *testing.T) {
 		}
 		return val * val, nil
 	}
-	taskQueue := New(handler)
-	futures := make([]AsyncAwaiter, 0)
+	futures := make([]awaiter, 0)
 	for i := 1; i <= 4; i++ {
-		futures = append(futures, taskQueue.Async(ctx, i))
+		future := Execute(ctx, handler, NoAbort, i)
+		futures = append(futures, future)
 	}
 	sum := 0
 	var savedError error
@@ -63,10 +62,10 @@ func TestAsyncWithTimeout(t *testing.T) {
 		}
 	}
 	elapsed := time.Since(started)
-	log.Printf("TestAsyncWithTimeout took %s", elapsed)
+	log.Printf("TestWithTimeout took %s", elapsed)
 	if savedError == nil {
 		t.Errorf("Expected error")
-	} else if !strings.Contains(savedError.Error(), "async_cancelled") {
+	} else if !strings.Contains(savedError.Error(), "deadline") {
 		t.Errorf("Expected fake even error but was %v", savedError)
 	}
 }
@@ -83,10 +82,10 @@ func TestAsyncWithFailure(t *testing.T) {
 		}
 		return val * val, nil
 	}
-	taskQueue := New(handler)
-	futures := make([]AsyncAwaiter, 0)
+	futures := make([]awaiter, 0)
 	for i := 1; i <= 4; i++ {
-		futures = append(futures, taskQueue.Async(ctx, i))
+		future := Execute(ctx, handler, NoAbort, i)
+		futures = append(futures, future)
 	}
 	sum := 0
 	var savedError error
@@ -99,7 +98,7 @@ func TestAsyncWithFailure(t *testing.T) {
 		}
 	}
 	elapsed := time.Since(started)
-	log.Printf("TestAsyncWithFailure took %s", elapsed)
+	log.Printf("TestWithFailure took %s", elapsed)
 	expected := 1 + 9
 	if sum != expected {
 		t.Errorf("Expected %v but was %v", expected, sum)
@@ -120,10 +119,10 @@ func TestAsync(t *testing.T) {
 		val := payload.(int)
 		return val * val, nil
 	}
-	taskQueue := New(handler)
-	futures := make([]AsyncAwaiter, 0)
+	futures := make([]awaiter, 0)
 	for i := 1; i <= 4; i++ {
-		futures = append(futures, taskQueue.Async(ctx, i))
+		future := Execute(ctx, handler, NoAbort, i)
+		futures = append(futures, future)
 	}
 	sum := 0
 	for i := 0; i < len(futures); i++ {
@@ -133,7 +132,7 @@ func TestAsync(t *testing.T) {
 		}
 	}
 	elapsed := time.Since(started)
-	log.Printf("TestAsync took %s", elapsed)
+	log.Printf("Test took %s", elapsed)
 	expected := 1 + 4 + 9 + 16
 	if sum != expected {
 		t.Errorf("Expected %v but was %v", expected, sum)

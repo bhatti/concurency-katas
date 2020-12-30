@@ -34,7 +34,7 @@ export class Crawler {
   async crawl(urls: string[], timeoutMillis: number): Promise<number> {
     // Main scope of concurrency begin
     const res = await doCrawl(urls, 0, timeoutMillis);
-    return res.childURLs
+    return res.childURLs;
     // Main scope of concurrency end
   }
 }
