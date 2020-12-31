@@ -21,7 +21,7 @@ func TestAsyncPollingWithTimeout(t *testing.T) {
 	}
 
 	future := ExecutePolling(ctx, handler, NoAbort, 0, poll)
-	_, _, err := future.Await(ctx, timeout)
+	_, err := future.Await(ctx, timeout)
 	if err == nil {
 		t.Errorf("Expected error")
 	} else if !strings.Contains(err.Error(), "timedout") {
@@ -45,7 +45,7 @@ func TestAsyncPollingWithFailure(t *testing.T) {
 	}
 
 	future := ExecutePolling(ctx, handler, NoAbort, 0, poll)
-	_, _, err := future.Await(ctx, timeout)
+	_, err := future.Await(ctx, timeout)
 	if err == nil {
 		t.Errorf("Expected error")
 	} else if !strings.Contains(err.Error(), "fake poll") {
@@ -66,12 +66,9 @@ func TestAsyncPolling(t *testing.T) {
 	}
 
 	future := ExecutePolling(ctx, handler, NoAbort, 0, poll)
-	done, res, err := future.Await(ctx, timeout)
+	res, err := future.Await(ctx, timeout)
 	if err != nil {
 		t.Errorf("Unexpected error %v", err)
-	}
-	if !done {
-		t.Errorf("Expected done %v", done)
 	}
 	if res != 5 {
 		t.Errorf("Expected count to 5")

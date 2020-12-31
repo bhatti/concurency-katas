@@ -2,7 +2,6 @@ package async
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 )
@@ -62,11 +61,7 @@ func (t *watchdogTask) Await(
 	result = nil
 	select {
 	case <-ctx.Done():
-		if ctx.Err() != nil {
-			err = ctx.Err()
-		} else {
-			err = errors.New("await canceled")
-		}
+		err = ctx.Err()
 	case res := <-t.resultQ:
 		result = res.Result
 		err = res.Err

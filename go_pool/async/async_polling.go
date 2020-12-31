@@ -2,7 +2,6 @@ package async
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 )
@@ -11,12 +10,6 @@ import (
 type pollingCompletionHandler func(
 	ctx context.Context,
 	payload interface{}) (bool, interface{}, error)
-
-// PollingAwaiter defines method to wait for result
-type PollingAwaiter interface {
-	Await(ctx context.Context, timeout time.Duration) (bool, interface{}, error)
-	IsRunning() bool
-}
 
 // pollingTask - processes data asynchronously
 type pollingTask struct {
@@ -40,7 +33,7 @@ func ExecutePolling(
 	completionHandler pollingCompletionHandler,
 	abortHandler AbortHandler,
 	request interface{},
-	pollInterval time.Duration) PollingAwaiter {
+	pollInterval time.Duration) Awaiter {
 	task := &pollingTask{
 		request:           request,
 		abortHandler:      abortHandler,
@@ -61,20 +54,14 @@ func (t *pollingTask) IsRunning() bool {
 // Await waits for completion of the task
 func (t *pollingTask) Await(
 	ctx context.Context,
-	timeout time.Duration) (completed bool, result interface{}, err error) {
-	completed = false
+	timeout time.Duration) (result interface{}, err error) {
 	result = nil
 	select {
 	case <-ctx.Done():
-		if ctx.Err() != nil {
-			err = ctx.Err()
-		} else {
-			err = errors.New("await canceled")
-		}
+		err = ctx.Err()
 	case res := <-t.resultQ:
 		result = res.Result
 		err = res.Err
-		completed = res.Completed
 	case <-time.After(timeout):
 		err = fmt.Errorf("async task timedout %v", timeout)
 	}
@@ -82,21 +69,6 @@ func (t *pollingTask) Await(
 		go t.abortHandler(ctx, t.request) // abortHandler operation
 	}
 	return
-}
-
-// PollingAwaitAll waits for completion of multiple tasks
-func PollingAwaitAll(
-	ctx context.Context,
-	timeout time.Duration,
-	all ...PollingAwaiter) []PollingResponse {
-	ctx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
-	results := make([]PollingResponse, 0)
-	for _, next := range all {
-		completed, res, err := next.Await(ctx, timeout)
-		results = append(results, PollingResponse{Response: Response{Result: res, Err: err}, Completed: completed})
-	}
-	return results
 }
 
 ////////////////////////////////////// PRIVATE METHODS ///////////////////////////////////////

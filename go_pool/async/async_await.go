@@ -6,12 +6,13 @@ import (
 	"time"
 )
 
-// type of async function
+// Handler - type of async function
 type Handler func(ctx context.Context, request interface{}) (interface{}, error)
 
-// type of abortHandler function that is called if async operation is cancelled
+// AbortHandler - type of abortHandler function that is called if async operation is cancelled
 type AbortHandler func(ctx context.Context, request interface{}) (interface{}, error)
 
+// NoAbort - default abort function
 func NoAbort(ctx context.Context, request interface{}) (interface{}, error) {
 	return nil, nil
 }
