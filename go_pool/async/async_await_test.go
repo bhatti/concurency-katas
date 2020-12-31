@@ -46,7 +46,7 @@ func TestAsyncWithTimeout(t *testing.T) {
 		}
 		return val * val, nil
 	}
-	futures := make([]awaiter, 0)
+	futures := make([]Awaiter, 0)
 	for i := 1; i <= 4; i++ {
 		future := Execute(ctx, handler, NoAbort, i)
 		futures = append(futures, future)
@@ -82,7 +82,7 @@ func TestAsyncWithFailure(t *testing.T) {
 		}
 		return val * val, nil
 	}
-	futures := make([]awaiter, 0)
+	futures := make([]Awaiter, 0)
 	for i := 1; i <= 4; i++ {
 		future := Execute(ctx, handler, NoAbort, i)
 		futures = append(futures, future)
@@ -119,17 +119,15 @@ func TestAsync(t *testing.T) {
 		val := payload.(int)
 		return val * val, nil
 	}
-	futures := make([]awaiter, 0)
+	futures := make([]Awaiter, 0)
 	for i := 1; i <= 4; i++ {
 		future := Execute(ctx, handler, NoAbort, i)
 		futures = append(futures, future)
 	}
 	sum := 0
-	for i := 0; i < len(futures); i++ {
-		res, _ := futures[i].Await(ctx, timeout)
-		if res != nil {
-			sum += res.(int)
-		}
+	results := AwaitAll(ctx, timeout, futures...)
+	for _, res := range results {
+		sum += res.Result.(int)
 	}
 	elapsed := time.Since(started)
 	log.Printf("Test took %s", elapsed)

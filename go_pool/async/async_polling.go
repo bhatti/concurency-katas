@@ -23,15 +23,15 @@ type pollingTask struct {
 	completionHandler pollingCompletionHandler
 	abortHandler      AbortHandler
 	request           interface{}
-	resultQ           chan pollingResponse
+	resultQ           chan PollingResponse
 	pollInterval      time.Duration
 	running           bool
 }
 
-// pollingResponse encapsulates results of async repeated task
-type pollingResponse struct {
-	response
-	completed bool
+// PollingResponse encapsulates results of async repeated task
+type PollingResponse struct {
+	Response
+	Completed bool
 }
 
 // ExecutePolling executes a function repeatedly polls a background task until it is completed
@@ -45,7 +45,7 @@ func ExecutePolling(
 		request:           request,
 		abortHandler:      abortHandler,
 		completionHandler: completionHandler,
-		resultQ:           make(chan pollingResponse, 1),
+		resultQ:           make(chan PollingResponse, 1),
 		pollInterval:      pollInterval,
 		running:           true,
 	}
@@ -72,9 +72,9 @@ func (t *pollingTask) Await(
 			err = errors.New("await canceled")
 		}
 	case res := <-t.resultQ:
-		result = res.result
-		err = res.err
-		completed = res.completed
+		result = res.Result
+		err = res.Err
+		completed = res.Completed
 	case <-time.After(timeout):
 		err = fmt.Errorf("async task timedout %v", timeout)
 	}
@@ -84,13 +84,28 @@ func (t *pollingTask) Await(
 	return
 }
 
+// PollingAwaitAll waits for completion of multiple tasks
+func PollingAwaitAll(
+	ctx context.Context,
+	timeout time.Duration,
+	all ...PollingAwaiter) []PollingResponse {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	results := make([]PollingResponse, 0)
+	for _, next := range all {
+		completed, res, err := next.Await(ctx, timeout)
+		results = append(results, PollingResponse{Response: Response{Result: res, Err: err}, Completed: completed})
+	}
+	return results
+}
+
 ////////////////////////////////////// PRIVATE METHODS ///////////////////////////////////////
 func (t *pollingTask) invokeHandlerAndCheckCompletion(ctx context.Context) bool {
 	completed, result, err := t.completionHandler(ctx, t.request)
-	if completed || err != nil {
-		t.resultQ <- pollingResponse{
-			response:  response{result: result, err: err},
-			completed: completed,
+	if t.running && (completed || err != nil) {
+		t.resultQ <- PollingResponse{
+			Response:  Response{Result: result, Err: err},
+			Completed: completed,
 		}
 		t.running = false
 		close(t.resultQ) // notify wait task

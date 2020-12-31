@@ -2,7 +2,6 @@ package async
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 )
@@ -28,14 +27,14 @@ type task struct {
 	handler      Handler
 	abortHandler AbortHandler
 	request      interface{}
-	resultQ      chan response
+	resultQ      chan Response
 	running      bool
 }
 
-// response encapsulates results of async task
-type response struct {
-	result interface{}
-	err    error
+// Response encapsulates results of async task
+type Response struct {
+	Result interface{}
+	Err    error
 }
 
 // Execute executes a long-running function in background and returns a future to wait for the response
@@ -48,7 +47,7 @@ func Execute(
 		request:      request,
 		handler:      handler,
 		abortHandler: abortHandler,
-		resultQ:      make(chan response, 1),
+		resultQ:      make(chan Response, 1),
 		running:      true,
 	}
 	go task.run(ctx) // run handler asynchronously
@@ -67,14 +66,10 @@ func (t *task) Await(
 	result = nil
 	select {
 	case <-ctx.Done():
-		if ctx.Err() != nil {
-			err = ctx.Err()
-		} else {
-			err = errors.New("async task cancelled")
-		}
+		err = ctx.Err()
 	case res := <-t.resultQ:
-		result = res.result
-		err = res.err
+		result = res.Result
+		err = res.Err
 	case <-time.After(timeout):
 		err = fmt.Errorf("async task timedout %v", timeout)
 	}
@@ -84,11 +79,26 @@ func (t *task) Await(
 	return
 }
 
+// AwaitAll waits for completion of multiple tasks
+func AwaitAll(
+	ctx context.Context,
+	timeout time.Duration,
+	all ...Awaiter) []Response {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	results := make([]Response, 0)
+	for _, next := range all {
+		res, err := next.Await(ctx, timeout)
+		results = append(results, Response{Result: res, Err: err})
+	}
+	return results
+}
+
 ////////////////////////////////////// PRIVATE METHODS ///////////////////////////////////////
 func (t *task) run(ctx context.Context) {
 	go func() {
 		result, err := t.handler(ctx, t.request)
-		t.resultQ <- response{result: result, err: err} // out channel is buffered by 1
+		t.resultQ <- Response{Result: result, Err: err} // out channel is buffered by 1
 		t.running = false
 		close(t.resultQ)
 	}()

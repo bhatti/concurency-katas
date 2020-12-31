@@ -17,7 +17,7 @@ type watchdogTask struct {
 	errorHandler watchdogHandler
 	abortHandler AbortHandler
 	request      interface{}
-	resultQ      chan response
+	resultQ      chan Response
 	errorQ       chan error
 	pollInterval time.Duration
 	running      bool
@@ -40,7 +40,7 @@ func ExecuteWatchdog(
 		handler:      handler,
 		abortHandler: abortHandler,
 		errorHandler: errorHandler,
-		resultQ:      make(chan response, 1),
+		resultQ:      make(chan Response, 1),
 		errorQ:       make(chan error, 1),
 		pollInterval: pollInterval,
 		running:      true,
@@ -68,8 +68,8 @@ func (t *watchdogTask) Await(
 			err = errors.New("await canceled")
 		}
 	case res := <-t.resultQ:
-		result = res.result
-		err = res.err
+		result = res.Result
+		err = res.Err
 	case err = <-t.errorQ:
 	case <-time.After(timeout):
 		err = fmt.Errorf("async task timedout %v", timeout)
@@ -96,7 +96,7 @@ func (t *watchdogTask) invokeErrorHandler(ctx context.Context) error {
 func (t *watchdogTask) runMain(ctx context.Context) {
 	go func() {
 		result, err := t.handler(ctx, t.request)
-		t.resultQ <- response{result: result, err: err} // out channel is buffered by 1
+		t.resultQ <- Response{Result: result, Err: err} // out channel is buffered by 1
 		t.running = false
 		close(t.resultQ) // notify wait task
 		close(t.errorQ)  // end go-routine for watchdog
