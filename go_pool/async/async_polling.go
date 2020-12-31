@@ -76,9 +76,8 @@ func (t *pollingTask) Await(
 		err = res.err
 		completed = res.completed
 	case <-time.After(timeout):
-		err = errors.New(fmt.Sprintf("async task timedout %v", timeout))
+		err = fmt.Errorf("async task timedout %v", timeout)
 	}
-	t.running = false
 	if err != nil {
 		go t.abortHandler(ctx, t.request) // abortHandler operation
 	}
@@ -93,6 +92,7 @@ func (t *pollingTask) invokeHandlerAndCheckCompletion(ctx context.Context) bool 
 			response:  response{result: result, err: err},
 			completed: completed,
 		}
+		t.running = false
 		close(t.resultQ) // notify wait task
 		return completed
 	}

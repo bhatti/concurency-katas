@@ -76,9 +76,8 @@ func (t *task) Await(
 		result = res.result
 		err = res.err
 	case <-time.After(timeout):
-		err = errors.New(fmt.Sprintf("async task timedout %v", timeout))
+		err = fmt.Errorf("async task timedout %v", timeout)
 	}
-	t.running = false
 	if err != nil {
 		go t.abortHandler(ctx, t.request) // abortHandler operation
 	}
@@ -90,6 +89,7 @@ func (t *task) run(ctx context.Context) {
 	go func() {
 		result, err := t.handler(ctx, t.request)
 		t.resultQ <- response{result: result, err: err} // out channel is buffered by 1
+		t.running = false
 		close(t.resultQ)
 	}()
 }

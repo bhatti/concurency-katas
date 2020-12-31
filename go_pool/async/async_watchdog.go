@@ -72,9 +72,8 @@ func (t *watchdogTask) Await(
 		err = res.err
 	case err = <-t.errorQ:
 	case <-time.After(timeout):
-		err = errors.New(fmt.Sprintf("async task timedout %v", timeout))
+		err = fmt.Errorf("async task timedout %v", timeout)
 	}
-	t.running = false
 	if err != nil {
 		go t.abortHandler(ctx, t.request) // abortHandler operation
 	}
@@ -86,6 +85,7 @@ func (t *watchdogTask) invokeErrorHandler(ctx context.Context) error {
 	err := t.errorHandler(ctx, t.request)
 	if err != nil {
 		t.errorQ <- err
+		t.running = false
 		close(t.errorQ)  // notify wait task
 		close(t.resultQ) // end go-routine for main handler
 		return err
@@ -97,8 +97,9 @@ func (t *watchdogTask) runMain(ctx context.Context) {
 	go func() {
 		result, err := t.handler(ctx, t.request)
 		t.resultQ <- response{result: result, err: err} // out channel is buffered by 1
-		close(t.resultQ)                                // notify wait task
-		close(t.errorQ)                                 // end go-routine for watchdog
+		t.running = false
+		close(t.resultQ) // notify wait task
+		close(t.errorQ)  // end go-routine for watchdog
 	}()
 }
 
