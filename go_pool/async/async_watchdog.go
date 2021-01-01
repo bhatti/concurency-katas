@@ -63,13 +63,11 @@ func (t *watchdogTask) Await(
 	select {
 	case <-ctx.Done():
 		err = ctx.Err()
+		t.abortHandler(ctx, t.request) // abortHandler operation
 	case res := <-t.resultQ:
 		result = res.Result
 		err = res.Err
 	case err = <-t.errorQ:
-	}
-	if err != nil {
-		go t.abortHandler(ctx, t.request) // abortHandler operation
 	}
 	return
 }

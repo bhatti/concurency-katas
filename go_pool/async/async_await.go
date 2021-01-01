@@ -69,12 +69,10 @@ func (t *task) Await(
 	select {
 	case <-ctx.Done():
 		err = ctx.Err()
+		t.abortHandler(ctx, t.request) // abortHandler operation
 	case res := <-t.resultQ:
 		result = res.Result
 		err = res.Err
-	}
-	if err != nil {
-		go t.abortHandler(ctx, t.request) // abortHandler operation
 	}
 	return
 }
