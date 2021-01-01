@@ -78,8 +78,7 @@ func (t *watchdogTask) invokeErrorHandler(ctx context.Context) error {
 	if err != nil {
 		t.errorQ <- err
 		t.running = false
-		close(t.errorQ)  // notify wait task
-		close(t.resultQ) // end go-routine for main handler
+		close(t.errorQ) // notify wait task
 		return err
 	}
 	return nil
@@ -91,7 +90,6 @@ func (t *watchdogTask) runMain(ctx context.Context) {
 		t.resultQ <- Response{Result: result, Err: err} // out channel is buffered by 1
 		t.running = false
 		close(t.resultQ) // notify wait task
-		close(t.errorQ)  // end go-routine for watchdog
 	}()
 }
 
