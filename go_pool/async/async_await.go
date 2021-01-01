@@ -2,7 +2,6 @@ package async
 
 import (
 	"context"
-	"fmt"
 	"time"
 )
 
@@ -65,14 +64,14 @@ func (t *task) Await(
 	ctx context.Context,
 	timeout time.Duration) (result interface{}, err error) {
 	result = nil
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
 	select {
 	case <-ctx.Done():
 		err = ctx.Err()
 	case res := <-t.resultQ:
 		result = res.Result
 		err = res.Err
-	case <-time.After(timeout):
-		err = fmt.Errorf("async task timedout %v", timeout)
 	}
 	if err != nil {
 		go t.abortHandler(ctx, t.request) // abortHandler operation

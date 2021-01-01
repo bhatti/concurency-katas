@@ -26,8 +26,8 @@ func TestAsyncWatchdogWithTimeout(t *testing.T) {
 	_, err := future.Await(ctx, timeout)
 	if err == nil {
 		t.Errorf("Expected error")
-	} else if !strings.Contains(err.Error(), "timedout") {
-		t.Errorf("Expected timedout error but was %v", err)
+	} else if !strings.Contains(err.Error(), "deadline exceeded") {
+		t.Errorf("Expected deadline exceeded but was %v", err)
 	}
 }
 

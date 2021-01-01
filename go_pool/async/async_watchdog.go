@@ -2,7 +2,6 @@ package async
 
 import (
 	"context"
-	"fmt"
 	"time"
 )
 
@@ -58,6 +57,8 @@ func (t *watchdogTask) IsRunning() bool {
 func (t *watchdogTask) Await(
 	ctx context.Context,
 	timeout time.Duration) (result interface{}, err error) {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
 	result = nil
 	select {
 	case <-ctx.Done():
@@ -66,8 +67,6 @@ func (t *watchdogTask) Await(
 		result = res.Result
 		err = res.Err
 	case err = <-t.errorQ:
-	case <-time.After(timeout):
-		err = fmt.Errorf("async task timedout %v", timeout)
 	}
 	if err != nil {
 		go t.abortHandler(ctx, t.request) // abortHandler operation

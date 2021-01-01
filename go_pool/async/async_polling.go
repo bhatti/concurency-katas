@@ -2,7 +2,6 @@ package async
 
 import (
 	"context"
-	"fmt"
 	"time"
 )
 
@@ -55,6 +54,8 @@ func (t *pollingTask) IsRunning() bool {
 func (t *pollingTask) Await(
 	ctx context.Context,
 	timeout time.Duration) (result interface{}, err error) {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
 	result = nil
 	select {
 	case <-ctx.Done():
@@ -62,8 +63,6 @@ func (t *pollingTask) Await(
 	case res := <-t.resultQ:
 		result = res.Result
 		err = res.Err
-	case <-time.After(timeout):
-		err = fmt.Errorf("async task timedout %v", timeout)
 	}
 	if err != nil {
 		go t.abortHandler(ctx, t.request) // abortHandler operation
